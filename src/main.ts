@@ -87,10 +87,11 @@ function showWindow(): void {
     function canonical(id: string) {
         if (cache.has(id))
             return cache.get(id)!;
-        id = objectManager.load(id)?.identifier || id;
-        if (!loadedObjects.has(id))
-            objectManager.unload(id);
-        return id;
+        const canonId = objectManager.load(id)?.identifier || id;
+        cache.set(id, canonId);
+        if (!loadedObjects.has(canonId))
+            objectManager.unload(canonId);
+        return canonId;
     }
 
     const cache2 = new Map();
