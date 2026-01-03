@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /// <reference path="../../OpenRCT2/distribution/openrct2.d.ts" />
-import { button, compute, groupbox, horizontal, label, listview, store, textbox, twoway, vertical, window } from 'openrct2-flexui';
+import { button, compute, dropdown, groupbox, horizontal, label, listview, store, textbox, twoway, vertical, window } from 'openrct2-flexui';
 
 /*
  * CLASSES
@@ -115,6 +115,7 @@ registerPlugin({
             console.log(`[Scenery Group Loader] Cached object types in ${elapsed}ms.`);
         }
         const installedGroups: GroupInfo[] = [];
+        const authors: string[] = ["< All >"];
         {
             const time = Date.now();
             // cache scenery groups and their items with checksummed identifiers
@@ -124,14 +125,15 @@ registerPlugin({
                 if (match) idMapCache.set(match[1], obj.identifier);
             });
             const loadedGroups = new Set(objectManager.getAllObjects("scenery_group").map(group => group.identifier));
-            let cnt = 0;
+            const authorCache = new Set();
             objectManager.installedObjects.filter(obj => obj.type === "scenery_group").forEach(installedGroup => {
+                const authors = installedGroup.authors.join(", ") || "< Unknown >";
+                authorCache.add(authors);
                 installedGroups.push({
                     name: installedGroup.name,
                     identifier: installedGroup.identifier,
-                    authors: installedGroup.authors.join(", "),
+                    authors,
                     items: (objectManager.load(installedGroup.identifier) as SceneryGroupObject).items.map(id => {
-                        cnt++;
                         const match = id.match(/(.{8}\|.{8})\|.{8}/);
                         return match && idMapCache.get(match[1]) || id;
                     }),
@@ -139,8 +141,9 @@ registerPlugin({
                 if (!loadedGroups.has(installedGroup.identifier))
                     objectManager.unload(installedGroup.identifier);
             });
+            authors.push(...authorCache.toArray().sort());
             const elapsed = Date.now() - time;
-            console.log(`[Scenery Group Loader] Cached scenery groups and ${cnt} items in ${elapsed}ms.`);
+            console.log(`[Scenery Group Loader] Cached scenery groups and items in ${elapsed}ms.`);
         }
 
         function showWindow(): void {
@@ -167,13 +170,17 @@ registerPlugin({
             );
 
             // scenery group filter
-            const filter = store<string>("");
-            const filteredGroups = compute(filter, value =>
+            const searchFilter = store<string>("");
+            const statusFilter = store<number>(0);
+            const authorFilter = store<number>(0);
+            const filteredGroups = compute(searchFilter, statusFilter, authorFilter, (searchValue, statusValue, authorValue) =>
                 installedGroups.filter(group => ["name", "identifier", "authors"].some(key =>
                     (group[key as keyof typeof group] || "")
                         .toString()
                         .toLowerCase()
-                        .includes(value.toLowerCase())
+                        .includes(searchValue.toLowerCase())
+                    && (statusValue === 0 || (statusValue === 1 && isLoaded(group.identifier)) || (statusValue === 2 && !isLoaded(group.identifier)))
+                    && (authorValue === 0 || group.authors === authors[authorValue])
                 ))
             );
 
@@ -276,24 +283,44 @@ registerPlugin({
                 title: "Scenery Group Loader",
                 content: [
                     horizontal([
-                        label({
-                            text: "Search:",
-                            width: 40,
-                        }),
-                        textbox({
-                            text: twoway(filter),
-                        }),
-                        button({
-                            text: "Clear",
-                            onClick: () => filter.set(""),
-                            width: 64,
-                            height: 14,
-                        }),
-                    ]),
-                    horizontal([
                         vertical({
                             width: "4w",
                             content: [
+                                horizontal([
+                                    label({
+                                        text: "Name / Identifier:",
+                                        width: 96,
+                                    }),
+                                    textbox({
+                                        text: twoway(searchFilter),
+                                    }),
+                                    button({
+                                        text: "Clear",
+                                        onClick: () => searchFilter.set(""),
+                                        width: 64,
+                                        height: 14,
+                                    }),
+                                    label({
+                                        padding: { left: 16 },
+                                        text: "Authors:",
+                                        width: 50,
+                                    }),
+                                    dropdown({
+                                        width: 200,
+                                        items: authors,
+                                        selectedIndex: twoway(authorFilter),
+                                    }),
+                                    label({
+                                        padding: { left: 16 },
+                                        text: "Status:",
+                                        width: 43,
+                                    }),
+                                    dropdown({
+                                        width: 100,
+                                        items: ["All", "Loaded", "Not loaded"],
+                                        selectedIndex: twoway(statusFilter),
+                                    }),
+                                ]),
                                 listview({
                                     columns: [
                                         { header: "Name", width: "2w", canSort: true, },
@@ -311,6 +338,7 @@ registerPlugin({
                             ],
                         }),
                         vertical([
+                            label({ text: "" }),
                             groupbox({
                                 width: "1w",
                                 height: "1w",
@@ -421,7 +449,7 @@ registerPlugin({
             }).open();
         }
 
-        ui.registerMenuItem("Load Scenery Groups", showWindow); // todo: change
+        ui.registerMenuItem("Scenery Group Loader", showWindow);
         showWindow(); // remove after testing
     },
 });
