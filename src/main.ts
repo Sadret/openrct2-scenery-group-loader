@@ -179,6 +179,7 @@ function showWindow(): void {
             value: 512,
             max: 1024,
         },
+        position: "center",
         title: "Scenery Group Loader",
         content: [
             horizontal([
@@ -206,8 +207,8 @@ function showWindow(): void {
                 items: listViewItems,
                 onClick,
             }),
-            horizontal((["small_scenery", "large_scenery", "wall"] satisfies ObjectType[]).map(type => label({
-                text: compute(toggle, () => `${type.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}: ${objectManager.getAllObjects(type).length}/2047`),
+            horizontal((["small_scenery", "large_scenery", "wall", "footpath_addition", "banner", "peep_animations"] satisfies ObjectType[]).map((type, idx) => label({
+                text: compute(toggle, () => `${type.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}:   ${objectManager.getAllObjects(type).length} / ${idx < 3 ? 2047 : 255}`),
             }))),
         ],
     }).open();
