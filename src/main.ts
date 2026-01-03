@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /// <reference path="../../OpenRCT2/distribution/openrct2.d.ts" />
-import { button, compute, horizontal, label, listview, store, textbox, twoway, window } from 'openrct2-flexui';
+import { button, compute, groupbox, horizontal, label, listview, store, textbox, twoway, vertical, window } from 'openrct2-flexui';
 
 class Set {
     private items: { [key: string]: undefined } = {};
@@ -59,7 +59,7 @@ registerPlugin({
         if (typeof ui === "undefined")
             return;
 
-        ui.registerMenuItem("Load Scenery Groups", showWindow);
+        ui.registerMenuItem("Load Scenery Groups", showWindow); // todo: change
         showWindow(); // remove after testing
     },
 });
@@ -91,6 +91,16 @@ function showWindow(): void {
         if (!loadedObjects.has(id))
             objectManager.unload(id);
         return id;
+    }
+
+    const cache2 = new Map();
+    function getType(id: string) {
+        if (cache2.has(id))
+            return cache2.get(id)!;
+        const loadedObject = objectManager.load(id);
+        const type = loadedObject?.type || "unknown";
+        cache2.set(id, type);
+        return type;
     }
 
     function getLoadedGroup(id: string): SceneryGroupObject {
@@ -168,6 +178,12 @@ function showWindow(): void {
         toggle.set(!toggle.get()); // force ui update
     }
 
+    const highlightedInstalled = store<InstalledObject | null>(null);
+    const highlightedLoaded = compute(highlightedInstalled, toggle, group => group && loadedGroups.has(group.identifier) && getLoadedGroup(group.identifier));
+    function onHighlight(index: number): void {
+        highlightedInstalled.set(filteredGroups.get()[index]);
+    }
+
     window({
         width: {
             min: 512,
@@ -197,19 +213,89 @@ function showWindow(): void {
                     height: 14,
                 }),
             ]),
-            listview({
-                columns: [
-                    { header: "Name", width: "2w", canSort: true, },
-                    { header: "Identifier", width: "2w", canSort: true, },
-                    { header: "Author(s)", width: "1w", canSort: true, },
-                    { header: "Status", width: "1w", canSort: true, },
-                ],
-                items: listViewItems,
-                onClick,
-            }),
+            horizontal([
+                vertical({
+                    width: "3w",
+                    content: [
+                        listview({
+                            columns: [
+                                { header: "Name", width: "2w", canSort: true, },
+                                { header: "Identifier", width: "2w", canSort: true, },
+                                { header: "Author(s)", width: "1w", canSort: true, },
+                                { header: "Status", width: "1w", canSort: true, },
+                            ],
+                            items: listViewItems,
+                            onClick,
+                            onHighlight,
+                        }),
+                    ],
+                }),
+                groupbox({
+                    width: "1w",
+                    height: "1w",
+                    text: "Scenery Group Information",
+                    content: [
+                        label({ text: "{BLACK}Name:" }),
+                        label({ text: compute(highlightedInstalled, group => group ? group.name : "None"), padding: { left: 16 } }),
+                        label({ text: "{BLACK}Identifier:" }),
+                        label({ text: compute(highlightedInstalled, group => group ? group.identifier : "None"), padding: { left: 16 } }),
+                        label({ text: "{BLACK}Author(s):" }),
+                        label({ text: compute(highlightedInstalled, group => group ? group.authors.join(", ") : "None"), padding: { left: 16 } }),
+                        label({ text: "{BLACK}Status:" }),
+                        label({ text: compute(highlightedLoaded, group => group ? "Loaded" : "Not Loaded"), padding: { left: 16 } }),
+                        label({ text: "{BLACK}Objects (Loaded / Total):" }),
+                        horizontal([
+                            label({ text: "TOTAL:", padding: { left: 16 } }),
+                            label({
+                                width: 64,
+                                text: compute(highlightedLoaded, group => {
+                                    if (!group) return padLeft("?", 64);
+                                    const objects = group.items;
+                                    const loaded = objects.filter(id => loadedObjects.has(canonical(id)));
+                                    return padLeft(`${loaded.length} / ${objects.length}`, 64);
+                                }),
+                            }),
+                        ]),
+                        ...(["small_scenery", "large_scenery", "wall", "footpath_addition", "banner", "peep_animations"] satisfies ObjectType[]).map(type =>
+                            horizontal([
+                                label({ text: `${toDisplayString(type)}:`, padding: { left: 16 } }),
+                                label({
+                                    width: 64,
+                                    text: compute(highlightedLoaded, group => {
+                                        if (!group) return padLeft("?", 64);
+                                        const objects = group.items.filter(id => getType(id) === type);
+                                        const loaded = objects.filter(id => loadedObjects.has(canonical(id)));
+                                        return padLeft(`${loaded.length} / ${objects.length}`, 64);
+                                    }),
+                                }),
+                            ]),
+                        ),
+                    ],
+                }),
+            ]),
             horizontal((["small_scenery", "large_scenery", "wall", "footpath_addition", "banner", "peep_animations"] satisfies ObjectType[]).map((type, idx) => label({
-                text: compute(toggle, () => `${type.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}:   ${objectManager.getAllObjects(type).length} / ${idx < 3 ? 2047 : 255}`),
+                text: compute(toggle, () => `${toDisplayString(type)}:   ${objectManager.getAllObjects(type).length} / ${idx < 3 ? 2047 : 255}`),
             }))),
         ],
     }).open();
+}
+
+function toDisplayString(text: string): string {
+    return text.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function padLeft(str: string, length: number): string {
+    const len = str.split("").reduce((len, char) => len + charLen(char), 0) + str.length - 1;
+    return len < 62 ? " ".repeat((62 - len) / 2) + str : str;
+}
+
+function charLen(str: string): number {
+    switch (str) {
+        case " ": return 1;
+        case "/": return 5;
+        case "0": return 7;
+        case "1": return 4;
+        // case "?": return 6;
+        default: return 6;
+    }
 }
