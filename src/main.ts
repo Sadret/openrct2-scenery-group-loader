@@ -118,8 +118,6 @@ const authors: string[] = ["< All >"];
 
 function openWindow(): void {
     if (installedGroups.length === 0) {
-        const time = Date.now();
-
         // cache installed objects info
         const types = new Set(["scenery_group", "small_scenery", "large_scenery", "wall", "footpath_addition", "banner"] satisfies ObjectType[]);
         objectManager.installedObjects.forEach(obj => types.has(obj.type) && objInfoCache.set(obj.identifier, obj.type));
@@ -148,9 +146,6 @@ function openWindow(): void {
                 objectManager.unload(installedGroup.identifier);
         });
         authors.push(...authorCache.toArray().sort());
-
-        const elapsed = Date.now() - time;
-        console.log(`[Scenery Group Loader] Initialised caches in ${elapsed}ms.`);
     }
 
     // cache loaded objects
@@ -201,7 +196,6 @@ function openWindow(): void {
     }
     function unloadUnused(objects: string[]): number {
         // find items that are unused and can be unloaded
-        const time = Date.now();
         const canUnload = new Set(objects);
         for (let x = 0; x < map.size.x; x++)
             for (let y = 0; y < map.size.y; y++)
@@ -219,9 +213,6 @@ function openWindow(): void {
                             break;
                     }
 
-        const elapsed = Date.now() - time;
-        console.log(`[Scenery Group Loader] Checked scenery usage in ${elapsed}ms.`);
-
         // close scenery window if open
         for (let i = 0; i < ui.windows; i++) {
             const win = ui.getWindow(i);
@@ -234,7 +225,6 @@ function openWindow(): void {
         // unload items
         const canUnloadArr = canUnload.toArray();
         unloadAll(canUnloadArr);
-        console.log(`[Scenery Group Loader] Unloaded ${canUnloadArr.length} objects in ${Date.now() - time - elapsed}ms.`);
 
         return canUnloadArr.length;
     }
@@ -288,7 +278,7 @@ function openWindow(): void {
             max: 2048,
         },
         position: "center",
-        title: "Scenery Group Loader",
+        title: "Scenery Group Loader (v.1.0.0)",
         content: [
             horizontal([
                 vertical({
@@ -354,11 +344,8 @@ function openWindow(): void {
                             items: listViewItems,
                             onClick: index => {
                                 const group = filteredGroups.get()[index];
-                                const time = Date.now();
                                 if (loadAll(group.items)) {
                                     load(group.identifier);
-                                    const elapsed = Date.now() - time;
-                                    console.log(`[Scenery Group Loader] Loaded group in ${elapsed}ms.`);
                                 } else if (unloadUnused(group.items) === group.items.length)
                                     unload(group.identifier);
                                 // force ui update
@@ -474,13 +461,11 @@ function openWindow(): void {
                                     height: 24,
                                     onClick: () => {
                                         unloadUnused(loaded.toArray().filter(obj => objInfoCache.get(obj) !== "scenery_group"));
-                                        const time = Date.now();
                                         installedGroups.filter(
                                             group => isLoaded(group.identifier)
                                         ).forEach(
                                             group => group.items.some(isLoaded) || unload(group.identifier)
                                         );
-                                        console.log(`[Scenery Group Loader] Unloaded unused groups in ${Date.now() - time}ms.`);
                                         // force ui update
                                         toggle.set(!toggle.get());
                                     },
@@ -529,7 +514,7 @@ function openHelpWindow() {
             groupbox({
                 text: "{BLACK}Contact:",
                 content: [
-                    "If you like this plugin, please leave a star on GitHub: github.com/Sadret/openrct2-group-loader",
+                    "If you like this plugin, please leave a star on GitHub: github.com/Sadret/openrct2-scenery-group-loader",
                     "If you find any bugs or if you have any ideas for improvements, you can open an issue on GitHub or contact",
                     "me on Discord: Sadret#2502",
                 ].map(text => label({ text })),
