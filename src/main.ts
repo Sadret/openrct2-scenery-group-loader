@@ -236,7 +236,7 @@ function openWindow(): void {
     const searchFilter = store<string>("");
     const statusFilter = store<number>(0);
     const authorFilter = store<number>(0);
-    const filteredGroups = compute(searchFilter, statusFilter, authorFilter, (searchValue, statusValue, authorValue) =>
+    const filteredGroups = compute(searchFilter, statusFilter, authorFilter, toggle, (searchValue, statusValue, authorValue) =>
         installedGroups.filter(group => ["name", "identifier", "authors"].some(key =>
             (group[key as keyof typeof group] || "")
                 .toString()
