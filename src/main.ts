@@ -120,6 +120,11 @@ const objInfoCache = new Map();
 const installedGroups: GroupInfo[] = [];
 const authors: string[] = ["< All >"];
 
+// scenery group filter
+const searchFilter = store<string>("");
+const statusFilter = store<number>(0);
+const authorFilter = store<number>(0);
+
 function openWindow(): void {
     if (installedGroups.length === 0) {
         // cache installed objects info
@@ -219,9 +224,6 @@ function openWindow(): void {
     const toggle = store<boolean>(false);
 
     // scenery group filter
-    const searchFilter = store<string>("");
-    const statusFilter = store<number>(0);
-    const authorFilter = store<number>(0);
     const filteredGroups = compute(searchFilter, statusFilter, authorFilter, toggle, (searchValue, statusValue, authorValue) =>
         installedGroups.filter(group => ["name", "identifier", "authors"].some(key =>
             (group[key as keyof typeof group] || "")
