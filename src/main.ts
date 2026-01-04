@@ -103,7 +103,11 @@ registerPlugin({
             return;
 
         ui.registerMenuItem("Scenery Group Loader", showWindow);
-        showWindow(); // remove after testing
+        ui.registerShortcut({
+            id: "openrct2.scenery-group-loader.open-window",
+            text: "Open Scenery Group Loader",
+            callback: showWindow,
+        });
     },
 });
 
