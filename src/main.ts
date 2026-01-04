@@ -149,17 +149,62 @@ registerPlugin({
         function showWindow(): void {
             // loaded objects cache
             const loaded = new Set();
-            function load(id: string): void {
+            function load(id: string): boolean {
                 if (isLoaded(id))
-                    return;
+                    return false;
                 const obj = objectManager.load(id);
-                if (obj)
-                    loaded.add(id);
+                if (!obj)
+                    return false;
+                loaded.add(id);
+                return true;
             }
-            function unload(id: string): void {
-                objectManager.unload(id);
-                loaded.remove(id);
+            function unload(arg: string | string[]): void {
+                if (Array.isArray(arg)) {
+                    objectManager.unload(arg);
+                    arg.forEach(id => loaded.remove(id));
+                } else {
+                    objectManager.unload(arg);
+                    loaded.remove(arg);
+                }
+            }
+            function unloadUnused(objects: string[]): number {
+                // find items that are unused and can be unloaded
+                const time = Date.now();
+                const canUnload = new Set(objects);
+                for (let x = 0; x < map.size.x; x++)
+                    for (let y = 0; y < map.size.y; y++)
+                        for (const element of map.getTile(x, y).elements)
+                            switch (element.type) {
+                                case "footpath":
+                                    if (element.addition)
+                                        canUnload.remove(objectManager.getObject("footpath_addition", element.addition).identifier);
+                                    break;
+                                case "small_scenery":
+                                case "wall":
+                                case "large_scenery":
+                                case "banner":
+                                    canUnload.remove(objectManager.getObject(element.type, element.object).identifier);
+                                    break;
+                            }
 
+                const elapsed = Date.now() - time;
+                console.log(`[Scenery Group Loader] Checked scenery usage in ${elapsed}ms.`);
+
+                // close scenery window if open
+                for (let i = 0; i < ui.windows; i++) {
+                    const win = ui.getWindow(i);
+                    if (win.classification == 18) {
+                        win.close();
+                        break;
+                    }
+                }
+
+                // unload items
+                const canUnloadArr = canUnload.toArray();
+                unload(canUnloadArr);
+                console.log(`[Scenery Group Loader] Unloaded ${canUnloadArr.length} objects in ${Date.now() - time - elapsed}ms.`);
+
+                return canUnloadArr.length;
             }
             function isLoaded(id: string): boolean {
                 return loaded.has(id);
@@ -184,6 +229,7 @@ registerPlugin({
                 ))
             );
 
+            // listview items
             function getStatus(group: GroupInfo): string {
                 if (!isLoaded(group.identifier))
                     return "Not loaded";
@@ -200,73 +246,8 @@ registerPlugin({
                 getStatus(group),
             ]));
 
-            function loadGroup(group: GroupInfo, mode: "group" | "objects" | "both"): void {
-                if (mode === "group" || mode === "both")
-                    load(group.identifier);
-                if (mode === "objects" || mode === "both")
-                    group.items.forEach(load);
-                // force ui update
-                toggle.set(!toggle.get());
-            }
-
-            function unloadGroup(group: GroupInfo, mode: "unused" | "group"): void {
-                if (mode === "group")
-                    unload(group.identifier);
-                else {
-                    // find items that are unused and can be unloaded
-                    const time = Date.now();
-                    const canUnload = new Set(group.items);
-                    for (let x = 0; x < map.size.x; x++)
-                        for (let y = 0; y < map.size.y; y++)
-                            for (const element of map.getTile(x, y).elements)
-                                switch (element.type) {
-                                    case "footpath":
-                                        if (element.addition)
-                                            canUnload.remove(objectManager.getObject("footpath_addition", element.addition).identifier);
-                                        break;
-                                    case "small_scenery":
-                                    case "wall":
-                                    case "large_scenery":
-                                    case "banner":
-                                        canUnload.remove(objectManager.getObject(element.type, element.object).identifier);
-                                        break;
-                                }
-                    // map.getAllEntities("staff").filter(staff => staff.animation)
-                    const elapsed = Date.now() - time;
-                    console.log(`[Scenery Group Loader] Checked scenery usage in ${elapsed}ms.`);
-
-                    // close scenery window if open
-                    for (let i = 0; i < ui.windows; i++) {
-                        const win = ui.getWindow(i);
-                        if (win.classification == 18) {
-                            win.close();
-                            break;
-                        }
-                    }
-
-                    // unload items
-                    const canUnloadArr = canUnload.toArray();
-                    canUnloadArr.forEach(unload);
-
-                    if (canUnloadArr.length === group.items.length)
-                        unload(group.identifier);
-                }
-                // force ui update
-                toggle.set(!toggle.get());
-            }
-
-            function onClick(index: number): void {
-                const group = filteredGroups.get()[index];
-                if (group.items.every(isLoaded))
-                    unloadGroup(group, "unused");
-                else
-                    loadGroup(group, "both");
-            }
-
+            // highlighted group
             const selectedGroup = store<GroupInfo | null>(null);
-            function onHighlight(index: number): void {
-                selectedGroup.set(filteredGroups.get()[index]);
-            }
 
             window({
                 width: {
@@ -329,12 +310,38 @@ registerPlugin({
                                         { header: "Status", width: "1w", canSort: true, },
                                     ],
                                     items: listViewItems,
-                                    onClick,
-                                    onHighlight,
+                                    onClick: index => {
+                                        const group = filteredGroups.get()[index];
+                                        if (group.items.map(load).some(Boolean))
+                                            load(group.identifier);
+                                        else if (unloadUnused(group.items) === group.items.length)
+                                            unload(group.identifier);
+                                        // force ui update
+                                        toggle.set(!toggle.get());
+                                    },
+                                    onHighlight: index => selectedGroup.set(filteredGroups.get()[index]),
                                 }),
-                                horizontal((["small_scenery", "large_scenery", "wall", "footpath_addition", "banner", "peep_animations"] satisfies ObjectType[]).map((type, idx) => label({
-                                    text: compute(toggle, () => `${toDisplayString(type)}:   ${getCounterLabel(objectManager.getAllObjects(type).length, idx < 3 ? 2047 : 255)}`),
-                                }))),
+                                horizontal([
+                                    ...(["small_scenery", "large_scenery", "wall", "footpath_addition", "banner", "peep_animations"] satisfies ObjectType[]).map((type, idx) => label({
+                                        text: compute(toggle, () => `${toDisplayString(type)}:   ${getCounterLabel(objectManager.getAllObjects(type).length, idx < 3 ? 2047 : 255)}`),
+                                    })),
+                                    button({
+                                        text: "Unload all unused",
+                                        height: 14,
+                                        onClick: () => {
+                                            unloadUnused(loaded.toArray().filter(obj => objInfoCache.get(obj) !== "scenery_group").filter(obj => objInfoCache.get(obj) !== "peep_animations"));
+                                            const time = Date.now();
+                                            installedGroups.filter(
+                                                group => isLoaded(group.identifier)
+                                            ).forEach(
+                                                group => group.items.some(isLoaded) || unload(group.identifier)
+                                            );
+                                            console.log(`[Scenery Group Loader] Unloaded unused groups in ${Date.now() - time}ms.`);
+                                            // force ui update
+                                            toggle.set(!toggle.get());
+                                        },
+                                    }),
+                                ]),
                             ],
                         }),
                         vertical([
@@ -398,8 +405,6 @@ registerPlugin({
                                                 text: compute(selectedGroup, toggle, group => {
                                                     if (!group) return padLeft("?", 23);
                                                     const objects = group.items.filter(id => objInfoCache.get(id) === type);
-                                                    if (type === "peep_animations" && objects.length > 0)
-                                                        console.log(group.identifier);
                                                     return padLeft(String(objects.length), 23);
                                                 }),
                                             }),
@@ -414,11 +419,14 @@ registerPlugin({
                                         disabled: compute(selectedGroup, group => group === null),
                                         onClick: () => {
                                             const group = selectedGroup.get();
-                                            if (group)
+                                            if (group) {
                                                 if (isLoaded(group.identifier))
-                                                    unloadGroup(group, "group");
+                                                    unload(group.identifier);
                                                 else
-                                                    loadGroup(group, "group");
+                                                    load(group.identifier);
+                                                // force ui update
+                                                toggle.set(!toggle.get());
+                                            }
                                         },
                                     }),
                                     button({
@@ -429,11 +437,17 @@ registerPlugin({
                                         disabled: compute(selectedGroup, group => group === null),
                                         onClick: () => {
                                             const group = selectedGroup.get();
-                                            if (group)
-                                                if (isLoaded(group.identifier))
-                                                    unloadGroup(group, "unused");
-                                                else
-                                                    loadGroup(group, "both");
+                                            if (group) {
+                                                if (isLoaded(group.identifier)) {
+                                                    if (unloadUnused(group.items) === group.items.length)
+                                                        unload(group.identifier);
+                                                } else {
+                                                    load(group.identifier);
+                                                    group.items.forEach(load);
+                                                }
+                                                // force ui update
+                                                toggle.set(!toggle.get());
+                                            }
                                         },
                                     }),
                                 ],
