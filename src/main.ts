@@ -322,9 +322,19 @@ registerPlugin({
                                     onHighlight: index => selectedGroup.set(filteredGroups.get()[index]),
                                 }),
                                 horizontal([
-                                    ...(["small_scenery", "large_scenery", "wall", "footpath_addition", "banner", "peep_animations"] satisfies ObjectType[]).map((type, idx) => label({
-                                        text: compute(toggle, () => `${toDisplayString(type)}:   ${getCounterLabel(objectManager.getAllObjects(type).length, idx < 3 ? 2047 : 255)}`),
-                                    })),
+                                    ...([["small_scenery", 77], ["large_scenery", 77], ["wall", 28], ["footpath_addition", 94], ["banner", 38], ["peep_animations", 87]] satisfies [ObjectType, number][]).map(
+                                        ([type, len], idx) => horizontal([
+                                            label({
+                                                text: `${toDisplayString(type)}:`,
+                                                width: len + 4,
+                                            }),
+                                            label({
+                                                width: (idx < 3 ? 69 : 53) + 2,
+                                                text: compute(toggle, () => `${padLeft(getCounterLabel(objectManager.getAllObjects(type).length, idx < 3 ? 2047 : 255), idx < 3 ? 69 : 53)}`),
+                                                padding: { right: 32 },
+                                            }),
+                                        ]),
+                                    ),
                                     button({
                                         text: "Unload all unused",
                                         height: 14,
