@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /// <reference path="../../OpenRCT2/distribution/openrct2.d.ts" />
-import { button, compute, dropdown, groupbox, horizontal, label, listview, store, textbox, twoway, vertical, window, type WritableStore } from 'openrct2-flexui';
+import { button, compute, dropdown, groupbox, horizontal, label, listview, store, textbox, twoway, vertical, window } from 'openrct2-flexui';
 
 /*
  * CLASSES
@@ -86,6 +86,10 @@ function charLen(str: string): number {
     }
 }
 
+function getCount(type: ObjectType): number {
+    return objectManager.getAllObjects(type).length;
+}
+
 /*
  * MAIN
  */
@@ -150,19 +154,9 @@ function openWindow(): void {
 
     // cache loaded objects
     const loaded = new Set();
-    const counter: { [key: string]: WritableStore<number> } = {
-        scenery_group: store<number>(0),
-        small_scenery: store<number>(0),
-        large_scenery: store<number>(0),
-        wall: store<number>(0),
-        footpath_addition: store<number>(0),
-        banner: store<number>(0),
-    };
-    (["scenery_group", "small_scenery", "large_scenery", "wall", "footpath_addition", "banner"] satisfies ObjectType[]).forEach(type => {
-        const objects = objectManager.getAllObjects(type);
-        counter[type].set(objects.length);
-        objects.forEach(obj => loaded.add(obj.identifier));
-    });
+    (["scenery_group", "small_scenery", "large_scenery", "wall", "footpath_addition", "banner"] satisfies ObjectType[]).forEach(
+        type => objectManager.getAllObjects(type).forEach(obj => loaded.add(obj.identifier))
+    );
 
     function isLoaded(id: string): boolean {
         return loaded.has(id);
@@ -175,11 +169,7 @@ function openWindow(): void {
         let objs = objectManager.load(ids).filter(obj => obj !== null);
         if (!objs.length)
             return false;
-        objs.forEach(obj => {
-            loaded.add(obj.identifier);
-            const cnter = counter[obj.type as any];
-            cnter.set(cnter.get() + 1);
-        });
+        objs.forEach(obj => loaded.add(obj.identifier));
         return true;
     }
     function unload(id: string): void {
@@ -188,11 +178,7 @@ function openWindow(): void {
     function unloadAll(ids: string[]): void {
         ids = ids.filter(isLoaded);
         objectManager.unload(ids);
-        ids.forEach(id => {
-            loaded.remove(id);
-            const cnter = counter[objInfoCache.get(id)!];
-            cnter.set(cnter.get() - 1);
-        });
+        ids.forEach(id => loaded.remove(id));
     }
     function unloadUnused(objects: string[]): number {
         // find items that are unused and can be unloaded
@@ -444,15 +430,15 @@ function openWindow(): void {
                                             }),
                                             label({
                                                 width: 32,
-                                                text: compute(counter[type], count => (count === max ? "{RED}" : "") + padLeft(String(count), 30)),
+                                                text: compute(toggle, () => (getCount(type) === max ? "{RED}" : "") + padLeft(String(getCount(type)), 30)),
                                             }),
                                             label({
                                                 width: 7,
-                                                text: compute(counter[type], count => (count === max ? "{RED}" : "") + "/"),
+                                                text: compute(toggle, () => (getCount(type) === max ? "{RED}" : "") + "/"),
                                             }),
                                             label({
                                                 width: 30,
-                                                text: compute(counter[type], count => (count === max ? "{RED}" : "") + padLeft(String(max), 28)),
+                                                text: compute(toggle, () => (getCount(type) === max ? "{RED}" : "") + padLeft(String(max), 28)),
                                             }),
                                         ]),
                                 ),
