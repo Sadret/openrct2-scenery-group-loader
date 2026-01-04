@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /// <reference path="../../OpenRCT2/distribution/openrct2.d.ts" />
-import { button, compute, dropdown, groupbox, horizontal, label, listview, store, textbox, twoway, vertical, window } from 'openrct2-flexui';
+import { button, compute, dropdown, groupbox, horizontal, label, listview, store, textbox, twoway, vertical, window, type WritableStore } from 'openrct2-flexui';
 
 /*
  * CLASSES
@@ -86,10 +86,6 @@ function charLen(str: string): number {
     }
 }
 
-function getCounterLabel(count: number, max: number): string {
-    return (count === max ? "{RED}" : "") + `${count} / ${max}`;
-}
-
 /*
  * MAIN
  */
@@ -154,9 +150,20 @@ function showWindow(): void {
 
     // cache loaded objects
     const loaded = new Set();
-    (["scenery_group", "small_scenery", "large_scenery", "wall", "footpath_addition", "banner", "peep_animations"] satisfies ObjectType[]).forEach(type =>
-        objectManager.getAllObjects(type).forEach(obj => loaded.add(obj.identifier))
-    );
+    const counter: { [key: string]: WritableStore<number> } = {
+        scenery_group: store<number>(0),
+        small_scenery: store<number>(0),
+        large_scenery: store<number>(0),
+        wall: store<number>(0),
+        footpath_addition: store<number>(0),
+        banner: store<number>(0),
+        peep_animations: store<number>(0),
+    };
+    (["scenery_group", "small_scenery", "large_scenery", "wall", "footpath_addition", "banner", "peep_animations"] satisfies ObjectType[]).forEach(type => {
+        const objects = objectManager.getAllObjects(type);
+        counter[type].set(objects.length);
+        objects.forEach(obj => loaded.add(obj.identifier));
+    });
 
     function isLoaded(id: string): boolean {
         return loaded.has(id);
@@ -168,15 +175,23 @@ function showWindow(): void {
         if (!obj)
             return false;
         loaded.add(id);
+        const cnter = counter[obj.type as any];
+        cnter.set(cnter.get() + 1);
         return true;
     }
     function unload(arg: string | string[]): void {
         if (Array.isArray(arg)) {
             objectManager.unload(arg);
-            arg.forEach(id => loaded.remove(id));
+            arg.forEach(id => {
+                loaded.remove(id);
+                const cnter = counter[objInfoCache.get(id)!];
+                cnter.set(cnter.get() - 1);
+            });
         } else {
             objectManager.unload(arg);
             loaded.remove(arg);
+            const cnter = counter[objInfoCache.get(arg)!];
+            cnter.set(cnter.get() - 1);
         }
     }
     function unloadUnused(objects: string[]): number {
@@ -219,6 +234,9 @@ function showWindow(): void {
         return canUnloadArr.length;
     }
 
+    // ui toggle to force updates
+    const toggle = store<boolean>(false);
+
     // scenery group filter
     const searchFilter = store<string>("");
     const statusFilter = store<number>(0);
@@ -243,7 +261,6 @@ function showWindow(): void {
             return `All ${group.items.length} objects loaded`;
         return `${loaded.length}/${group.items.length} objects loaded`;
     }
-    const toggle = store<boolean>(false);
     const listViewItems = compute(filteredGroups, toggle, value => value.map(group => [
         group.name,
         group.identifier,
@@ -256,11 +273,11 @@ function showWindow(): void {
 
     window({
         width: {
-            min: 512,
+            min: 1024,
             value: 1536,
-            max: 2048,
+            max: 8192,
         },
-        height: "auto",
+        height: 524,
         position: "center",
         title: "Scenery Group Loader",
         content: [
@@ -269,47 +286,61 @@ function showWindow(): void {
                     width: "4w",
                     content: [
                         horizontal([
-                            label({
-                                text: "Name / Identifier:",
-                                width: 96,
+                            horizontal({
+                                width: "4w",
+                                content: [
+                                    label({
+                                        text: "Name / Identifier:",
+                                        width: 96,
+                                    }),
+                                    textbox({
+                                        text: twoway(searchFilter),
+                                    }),
+                                    button({
+                                        text: "Clear",
+                                        onClick: () => searchFilter.set(""),
+                                        width: 64,
+                                        height: 14,
+                                    }),
+                                    label({
+                                        padding: { left: 10 },
+                                        text: "Author(s):",
+                                        width: 58,
+                                    }),
+                                ],
                             }),
-                            textbox({
-                                text: twoway(searchFilter),
+                            horizontal({
+                                width: "1w",
+                                content: [
+                                    dropdown({
+                                        padding: { right: 13 },
+                                        items: authors,
+                                        selectedIndex: twoway(authorFilter),
+                                    }),
+                                ],
                             }),
-                            button({
-                                text: "Clear",
-                                onClick: () => searchFilter.set(""),
-                                width: 64,
-                                height: 14,
-                            }),
-                            label({
-                                padding: { left: 16 },
-                                text: "Authors:",
-                                width: 50,
-                            }),
-                            dropdown({
-                                width: 200,
-                                items: authors,
-                                selectedIndex: twoway(authorFilter),
-                            }),
-                            label({
-                                padding: { left: 16 },
-                                text: "Status:",
-                                width: 43,
-                            }),
-                            dropdown({
-                                width: 100,
-                                items: ["All", "Loaded", "Not loaded"],
-                                selectedIndex: twoway(statusFilter),
+                            horizontal({
+                                width: 147,
+                                content: [
+                                    label({
+                                        text: "Status:",
+                                        width: 43,
+                                        padding: { left: -3 },
+                                    }),
+                                    dropdown({
+                                        width: 103,
+                                        items: ["All", "Loaded", "Not loaded"],
+                                        selectedIndex: twoway(statusFilter),
+                                    }),
+                                ],
                             }),
                         ]),
                         listview({
-                            height: 200,
                             columns: [
                                 { header: "Name", width: "2w", canSort: true, },
                                 { header: "Identifier", width: "2w", canSort: true, },
                                 { header: "Author(s)", width: "1w", canSort: true, },
-                                { header: "Status", width: "1w", canSort: true, },
+                                { header: "Status", width: 150, canSort: true, },
                             ],
                             items: listViewItems,
                             onClick: index => {
@@ -325,59 +356,34 @@ function showWindow(): void {
                         }),
                     ],
                 }),
-                vertical([
-                    label({
-                        text: "Copyright (c) 2026 Sadret",
-                        disabled: true,
-                        alignment: "centred",
-                    }),
-                    groupbox({
-                        width: "1w",
-                        text: "{BLACK}Scenery Group Information",
-                        content: [
-                            label({ text: "{BLACK}Name:" }),
-                            label({ text: compute(selectedGroup, group => group ? group.name : "None"), padding: { left: 16 } }),
-                            label({ text: "{BLACK}Identifier:" }),
-                            label({ text: compute(selectedGroup, group => group ? group.identifier : "None"), padding: { left: 16 } }),
-                            label({ text: "{BLACK}Author(s):" }),
-                            label({ text: compute(selectedGroup, group => group ? group.authors : "None"), padding: { left: 16 } }),
-                            label({ text: "{BLACK}Status:" }),
-                            label({ text: compute(selectedGroup, toggle, group => (group && isLoaded(group.identifier)) ? "Loaded" : "Not Loaded"), padding: { left: 16 } }),
-                            label({ text: "{BLACK}Objects   (Loaded / Total):" }),
-                            horizontal([
-                                label({ text: "TOTAL:", padding: { left: 16 } }),
-                                label({
-                                    width: 25,
-                                    text: compute(selectedGroup, toggle, group => {
-                                        if (!group) return padLeft("?", 23);
-                                        const loaded = group.items.filter(isLoaded);
-                                        return padLeft(`${loaded.length}`, 23);
-                                    }),
-                                }),
-                                label({
-                                    width: 7,
-                                    text: "/",
-                                }),
-                                label({
-                                    width: 30,
-                                    text: compute(selectedGroup, toggle, group => {
-                                        if (!group) return padLeft("?", 28);
-                                        return padLeft(String(group.items.length), 28);
-                                    }),
-                                }),
-                            ]),
-                            ...(["small_scenery", "large_scenery", "wall", "footpath_addition", "banner", "peep_animations"] satisfies ObjectType[]).map(type =>
+                vertical({
+                    width: 300,
+                    content: [
+                        label({
+                            text: "Copyright (c) 2026 Sadret",
+                            disabled: true,
+                            alignment: "centred",
+                        }),
+                        groupbox({
+                            text: "{BLACK}Scenery Group Information:",
+                            content: [
+                                label({ text: "{BLACK}Name:" }),
+                                label({ text: compute(selectedGroup, group => group ? group.name : "None"), padding: { left: 16 } }),
+                                label({ text: "{BLACK}Identifier:" }),
+                                label({ text: compute(selectedGroup, group => group ? group.identifier : "None"), padding: { left: 16 } }),
+                                label({ text: "{BLACK}Author(s):" }),
+                                label({ text: compute(selectedGroup, group => group ? group.authors : "None"), padding: { left: 16 } }),
+                                label({ text: "{BLACK}Status:" }),
+                                label({ text: compute(selectedGroup, toggle, group => (group && isLoaded(group.identifier)) ? "Loaded" : "Not Loaded"), padding: { left: 16 } }),
+                                label({ text: "{BLACK}Objects   (Loaded / Total):" }),
                                 horizontal([
+                                    label({ text: "TOTAL:", padding: { left: 16 } }),
                                     label({
-                                        text: `${toDisplayString(type)}:`,
-                                        padding: { left: 16 },
-                                    }),
-                                    label({
-                                        width: 32,
+                                        width: 25,
                                         text: compute(selectedGroup, toggle, group => {
-                                            if (!group) return padLeft("?", 30);
-                                            const loaded = group.items.filter(id => objInfoCache.get(id) === type && isLoaded(id));
-                                            return padLeft(`${loaded.length}`, 30);
+                                            if (!group) return padLeft("?", 23);
+                                            const loaded = group.items.filter(isLoaded);
+                                            return padLeft(`${loaded.length}`, 23);
                                         }),
                                     }),
                                     label({
@@ -388,56 +394,86 @@ function showWindow(): void {
                                         width: 30,
                                         text: compute(selectedGroup, toggle, group => {
                                             if (!group) return padLeft("?", 28);
-                                            const objects = group.items.filter(id => objInfoCache.get(id) === type);
-                                            return padLeft(String(objects.length), 28);
+                                            return padLeft(String(group.items.length), 28);
                                         }),
                                     }),
                                 ]),
-                            ),
-                        ],
-                    }),
-                    groupbox({
-                        text: "{BLACK}Loaded Objects Information",
-                        content: [
-                            ...(["small_scenery", "large_scenery", "wall", "footpath_addition", "banner", "peep_animations", "scenery_group"] satisfies ObjectType[]).map((type, idx) =>
-                                horizontal([
-                                    label({
-                                        text: `${toDisplayString(type)}:`,
-                                        padding: { left: 16 },
-                                    }),
-                                    label({
-                                        width: 32,
-                                        text: compute(toggle, () => padLeft(String(objectManager.getAllObjects(type).length), 30)),
-                                    }),
-                                    label({
-                                        width: 7,
-                                        text: "/",
-                                    }),
-                                    label({
-                                        width: 30,
-                                        text: padLeft(String(idx < 3 ? 2047 : 255), 28),
-                                    }),
-                                ]),
-                            ),
-                            button({
-                                text: "Unload all unused",
-                                height: 14,
-                                onClick: () => {
-                                    unloadUnused(loaded.toArray().filter(obj => objInfoCache.get(obj) !== "scenery_group").filter(obj => objInfoCache.get(obj) !== "peep_animations"));
-                                    const time = Date.now();
-                                    installedGroups.filter(
-                                        group => isLoaded(group.identifier)
-                                    ).forEach(
-                                        group => group.items.some(isLoaded) || unload(group.identifier)
-                                    );
-                                    console.log(`[Scenery Group Loader] Unloaded unused groups in ${Date.now() - time}ms.`);
-                                    // force ui update
-                                    toggle.set(!toggle.get());
-                                },
-                            }),
-                        ],
-                    }),
-                ]),
+                                ...(["small_scenery", "large_scenery", "wall", "footpath_addition", "banner", "peep_animations"] satisfies ObjectType[]).map(type =>
+                                    horizontal([
+                                        label({
+                                            text: `${toDisplayString(type)}:`,
+                                            padding: { left: 16 },
+                                        }),
+                                        label({
+                                            width: 32,
+                                            text: compute(selectedGroup, toggle, group => {
+                                                if (!group) return padLeft("?", 30);
+                                                const loaded = group.items.filter(id => objInfoCache.get(id) === type && isLoaded(id));
+                                                return padLeft(`${loaded.length}`, 30);
+                                            }),
+                                        }),
+                                        label({
+                                            width: 7,
+                                            text: "/",
+                                        }),
+                                        label({
+                                            width: 30,
+                                            text: compute(selectedGroup, toggle, group => {
+                                                if (!group) return padLeft("?", 28);
+                                                const objects = group.items.filter(id => objInfoCache.get(id) === type);
+                                                return padLeft(String(objects.length), 28);
+                                            }),
+                                        }),
+                                    ]),
+                                ),
+                            ],
+                        }),
+                        groupbox({
+                            text: "{BLACK}Loaded Objects Information (Loaded / Maximum):",
+                            content: [
+                                ...(["small_scenery", "large_scenery", "wall", "footpath_addition", "banner", "peep_animations", "scenery_group"] satisfies ObjectType[]).map(
+                                    (type, idx) => ([type, idx < 3 ? 2047 : 255] satisfies [string, number]),
+                                ).map(
+                                    ([type, max]) =>
+                                        horizontal([
+                                            label({
+                                                text: `${toDisplayString(type)}:`,
+                                                padding: { left: 16 },
+                                            }),
+                                            label({
+                                                width: 32,
+                                                text: compute(counter[type], count => (count === max ? "{RED}" : "") + padLeft(String(count), 30)),
+                                            }),
+                                            label({
+                                                width: 7,
+                                                text: compute(counter[type], count => (count === max ? "{RED}" : "") + "/"),
+                                            }),
+                                            label({
+                                                width: 30,
+                                                text: compute(counter[type], count => (count === max ? "{RED}" : "") + padLeft(String(max), 28)),
+                                            }),
+                                        ]),
+                                ),
+                                button({
+                                    text: "Unload all unused",
+                                    height: 24,
+                                    onClick: () => {
+                                        unloadUnused(loaded.toArray().filter(obj => objInfoCache.get(obj) !== "scenery_group").filter(obj => objInfoCache.get(obj) !== "peep_animations"));
+                                        const time = Date.now();
+                                        installedGroups.filter(
+                                            group => isLoaded(group.identifier)
+                                        ).forEach(
+                                            group => group.items.some(isLoaded) || unload(group.identifier)
+                                        );
+                                        console.log(`[Scenery Group Loader] Unloaded unused groups in ${Date.now() - time}ms.`);
+                                        // force ui update
+                                        toggle.set(!toggle.get());
+                                    },
+                                }),
+                            ],
+                        }),
+                    ],
+                }),
             ]),
         ],
     }).open();
