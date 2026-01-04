@@ -173,30 +173,31 @@ function showWindow(): void {
         return loaded.has(id);
     }
     function load(id: string): boolean {
-        if (isLoaded(id))
+        return !isLoaded(id) && loadAll([id]);
+    }
+    function loadAll(ids: string[]): boolean {
+        ids = ids.filter(id => !isLoaded(id));
+        let objs = objectManager.load(ids).filter(obj => obj !== null);
+        if (!objs.length)
             return false;
-        const obj = objectManager.load(id);
-        if (!obj)
-            return false;
-        loaded.add(id);
-        const cnter = counter[obj.type as any];
-        cnter.set(cnter.get() + 1);
+        objs.forEach(obj => {
+            loaded.add(obj.identifier);
+            const cnter = counter[obj.type as any];
+            cnter.set(cnter.get() + 1);
+        });
         return true;
     }
-    function unload(arg: string | string[]): void {
-        if (Array.isArray(arg)) {
-            objectManager.unload(arg);
-            arg.forEach(id => {
-                loaded.remove(id);
-                const cnter = counter[objInfoCache.get(id)!];
-                cnter.set(cnter.get() - 1);
-            });
-        } else {
-            objectManager.unload(arg);
-            loaded.remove(arg);
-            const cnter = counter[objInfoCache.get(arg)!];
+    function unload(id: string): void {
+        isLoaded(id) && unloadAll([id]);
+    }
+    function unloadAll(ids: string[]): void {
+        ids = ids.filter(isLoaded);
+        objectManager.unload(ids);
+        ids.forEach(id => {
+            loaded.remove(id);
+            const cnter = counter[objInfoCache.get(id)!];
             cnter.set(cnter.get() - 1);
-        }
+        });
     }
     function unloadUnused(objects: string[]): number {
         // find items that are unused and can be unloaded
@@ -232,7 +233,7 @@ function showWindow(): void {
 
         // unload items
         const canUnloadArr = canUnload.toArray();
-        unload(canUnloadArr);
+        unloadAll(canUnloadArr);
         console.log(`[Scenery Group Loader] Unloaded ${canUnloadArr.length} objects in ${Date.now() - time - elapsed}ms.`);
 
         return canUnloadArr.length;
@@ -353,9 +354,12 @@ function showWindow(): void {
                             items: listViewItems,
                             onClick: index => {
                                 const group = filteredGroups.get()[index];
-                                if (group.items.map(load).some(Boolean))
+                                const time = Date.now();
+                                if (loadAll(group.items)) {
                                     load(group.identifier);
-                                else if (unloadUnused(group.items) === group.items.length)
+                                    const elapsed = Date.now() - time;
+                                    console.log(`[Scenery Group Loader] Loaded group in ${elapsed}ms.`);
+                                } else if (unloadUnused(group.items) === group.items.length)
                                     unload(group.identifier);
                                 // force ui update
                                 toggle.set(!toggle.get());
