@@ -102,11 +102,11 @@ registerPlugin({
         if (typeof ui === "undefined")
             return;
 
-        ui.registerMenuItem("Scenery Group Loader", showWindow);
+        ui.registerMenuItem("Scenery Group Loader", openWindow);
         ui.registerShortcut({
             id: "openrct2.scenery-group-loader.open-window",
             text: "Open Scenery Group Loader",
-            callback: showWindow,
+            callback: openWindow,
         });
     },
 });
@@ -116,7 +116,7 @@ const objInfoCache = new Map();
 const installedGroups: GroupInfo[] = [];
 const authors: string[] = ["< All >"];
 
-function showWindow(): void {
+function openWindow(): void {
     if (installedGroups.length === 0) {
         const time = Date.now();
 
@@ -371,7 +371,13 @@ function showWindow(): void {
                 vertical({
                     width: 300,
                     content: [
-                        label({ text: "" }),
+                        button({
+                            width: 50,
+                            height: 14,
+                            padding: { left: "1w" },
+                            text: "Help",
+                            onClick: openHelpWindow,
+                        }),
                         groupbox({
                             text: "{BLACK}Scenery Group Information:",
                             content: [
@@ -464,7 +470,7 @@ function showWindow(): void {
                                         ]),
                                 ),
                                 button({
-                                    text: "Unload all unused",
+                                    text: "Unload ALL unused objects and groups",
                                     height: 24,
                                     onClick: () => {
                                         unloadUnused(loaded.toArray().filter(obj => objInfoCache.get(obj) !== "scenery_group"));
@@ -489,6 +495,45 @@ function showWindow(): void {
                     ],
                 }),
             ]),
+        ],
+    }).open();
+}
+
+function openHelpWindow() {
+    window({
+        width: 570,
+        height: "auto",
+        position: "center",
+        title: "Scenery Group Loader - Help",
+        content: [
+            groupbox({
+                text: "{BLACK}Instructions:",
+                content: [
+                    "- Click a row once to load the group and all of its objects.",
+                    "- Click a row a second time to unload all unused objects of that group. If all objects of a group are unloaded,",
+                    "the group will also be unloaded.",
+                    "- Click the button in the bottom right corner to unload all unused objects and all groups without any",
+                    "loaded objects.",
+                    "- The plugin has a keyboard shortcut to open its window, which can be assigned in OpenRCT2's settings.",
+                    "(Options -> Controls -> Shortcut keys... -> last tab -> Open Scenery Group Loader)",
+                ].map(text => label({ text })),
+            }),
+            groupbox({
+                text: "{BLACK}Release Information:",
+                content: [
+                    "Scenery Group Loader v1.0.0",
+                    "Copyright (c) 2026 Sadret",
+                    "The OpenRCT2 plugin \"Scenery Group Loader\" is licensed under the GNU General Public License version 3.",
+                ].map(text => label({ text })),
+            }),
+            groupbox({
+                text: "{BLACK}Contact:",
+                content: [
+                    "If you like this plugin, please leave a star on GitHub: github.com/Sadret/openrct2-group-loader",
+                    "If you find any bugs or if you have any ideas for improvements, you can open an issue on GitHub or contact",
+                    "me on Discord: Sadret#2502",
+                ].map(text => label({ text })),
+            }),
         ],
     }).open();
 }
