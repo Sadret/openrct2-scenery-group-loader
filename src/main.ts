@@ -121,7 +121,8 @@ function showWindow(): void {
         const time = Date.now();
 
         // cache installed objects info
-        objectManager.installedObjects.forEach(obj => objInfoCache.set(obj.identifier, obj.type));
+        const types = new Set(["scenery_group", "small_scenery", "large_scenery", "wall", "footpath_addition", "banner"] satisfies ObjectType[]);
+        objectManager.installedObjects.forEach(obj => types.has(obj.type) && objInfoCache.set(obj.identifier, obj.type));
 
         // cache scenery groups and their items with checksummed identifiers
         const idMapCache = new Map();
@@ -141,7 +142,7 @@ function showWindow(): void {
                 items: (objectManager.load(installedGroup.identifier) as SceneryGroupObject).items.map(id => {
                     const match = id.match(/(.{8}\|.{8})\|.{8}/);
                     return match && idMapCache.get(match[1]) || id;
-                }),
+                }).filter(id => objInfoCache.has(id)),
             });
             if (!loadedGroups.has(installedGroup.identifier))
                 objectManager.unload(installedGroup.identifier);
@@ -161,9 +162,8 @@ function showWindow(): void {
         wall: store<number>(0),
         footpath_addition: store<number>(0),
         banner: store<number>(0),
-        peep_animations: store<number>(0),
     };
-    (["scenery_group", "small_scenery", "large_scenery", "wall", "footpath_addition", "banner", "peep_animations"] satisfies ObjectType[]).forEach(type => {
+    (["scenery_group", "small_scenery", "large_scenery", "wall", "footpath_addition", "banner"] satisfies ObjectType[]).forEach(type => {
         const objects = objectManager.getAllObjects(type);
         counter[type].set(objects.length);
         objects.forEach(obj => loaded.add(obj.identifier));
@@ -281,7 +281,11 @@ function showWindow(): void {
             value: 1536,
             max: 8192,
         },
-        height: 524,
+        height: {
+            min: 512,
+            value: 768,
+            max: 2048,
+        },
         position: "center",
         title: "Scenery Group Loader",
         content: [
@@ -363,11 +367,7 @@ function showWindow(): void {
                 vertical({
                     width: 300,
                     content: [
-                        label({
-                            text: "Copyright (c) 2026 Sadret",
-                            disabled: true,
-                            alignment: "centred",
-                        }),
+                        label({ text: "" }),
                         groupbox({
                             text: "{BLACK}Scenery Group Information:",
                             content: [
@@ -402,7 +402,7 @@ function showWindow(): void {
                                         }),
                                     }),
                                 ]),
-                                ...(["small_scenery", "large_scenery", "wall", "footpath_addition", "banner", "peep_animations"] satisfies ObjectType[]).map(type =>
+                                ...(["small_scenery", "large_scenery", "wall", "footpath_addition", "banner"] satisfies ObjectType[]).map(type =>
                                     horizontal([
                                         label({
                                             text: `${toDisplayString(type)}:`,
@@ -433,9 +433,10 @@ function showWindow(): void {
                             ],
                         }),
                         groupbox({
+                            padding: { top: "1w" },
                             text: "{BLACK}Loaded Objects Information (Loaded / Maximum):",
                             content: [
-                                ...(["small_scenery", "large_scenery", "wall", "footpath_addition", "banner", "peep_animations", "scenery_group"] satisfies ObjectType[]).map(
+                                ...(["small_scenery", "large_scenery", "wall", "footpath_addition", "banner", "scenery_group"] satisfies ObjectType[]).map(
                                     (type, idx) => ([type, idx < 3 ? 2047 : 255] satisfies [string, number]),
                                 ).map(
                                     ([type, max]) =>
@@ -462,7 +463,7 @@ function showWindow(): void {
                                     text: "Unload all unused",
                                     height: 24,
                                     onClick: () => {
-                                        unloadUnused(loaded.toArray().filter(obj => objInfoCache.get(obj) !== "scenery_group").filter(obj => objInfoCache.get(obj) !== "peep_animations"));
+                                        unloadUnused(loaded.toArray().filter(obj => objInfoCache.get(obj) !== "scenery_group"));
                                         const time = Date.now();
                                         installedGroups.filter(
                                             group => isLoaded(group.identifier)
@@ -475,6 +476,11 @@ function showWindow(): void {
                                     },
                                 }),
                             ],
+                        }),
+                        label({
+                            text: "Copyright (c) 2026 Sadret",
+                            disabled: true,
+                            alignment: "centred",
                         }),
                     ],
                 }),
