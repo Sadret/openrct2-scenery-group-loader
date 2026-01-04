@@ -260,11 +260,7 @@ function showWindow(): void {
             value: 1536,
             max: 2048,
         },
-        height: {
-            min: 256,
-            value: 512,
-            max: 1024,
-        },
+        height: "auto",
         position: "center",
         title: "Scenery Group Loader",
         content: [
@@ -308,6 +304,7 @@ function showWindow(): void {
                             }),
                         ]),
                         listview({
+                            height: 200,
                             columns: [
                                 { header: "Name", width: "2w", canSort: true, },
                                 { header: "Identifier", width: "2w", canSort: true, },
@@ -326,45 +323,17 @@ function showWindow(): void {
                             },
                             onHighlight: index => selectedGroup.set(filteredGroups.get()[index]),
                         }),
-                        horizontal([
-                            ...([["small_scenery", 77], ["large_scenery", 77], ["wall", 28], ["footpath_addition", 94], ["banner", 38], ["peep_animations", 87]] satisfies [ObjectType, number][]).map(
-                                ([type, len], idx) => horizontal([
-                                    label({
-                                        text: `${toDisplayString(type)}:`,
-                                        width: len + 4,
-                                    }),
-                                    label({
-                                        width: (idx < 3 ? 69 : 53) + 2,
-                                        text: compute(toggle, () => `${padLeft(getCounterLabel(objectManager.getAllObjects(type).length, idx < 3 ? 2047 : 255), idx < 3 ? 69 : 53)}`),
-                                        padding: { right: 32 },
-                                    }),
-                                ]),
-                            ),
-                            button({
-                                text: "Unload all unused",
-                                height: 14,
-                                onClick: () => {
-                                    unloadUnused(loaded.toArray().filter(obj => objInfoCache.get(obj) !== "scenery_group").filter(obj => objInfoCache.get(obj) !== "peep_animations"));
-                                    const time = Date.now();
-                                    installedGroups.filter(
-                                        group => isLoaded(group.identifier)
-                                    ).forEach(
-                                        group => group.items.some(isLoaded) || unload(group.identifier)
-                                    );
-                                    console.log(`[Scenery Group Loader] Unloaded unused groups in ${Date.now() - time}ms.`);
-                                    // force ui update
-                                    toggle.set(!toggle.get());
-                                },
-                            }),
-                        ]),
                     ],
                 }),
                 vertical([
-                    label({ text: "" }),
+                    label({
+                        text: "Copyright (c) 2026 Sadret",
+                        disabled: true,
+                        alignment: "centred",
+                    }),
                     groupbox({
                         width: "1w",
-                        height: "1w",
-                        text: "Scenery Group Information",
+                        text: "{BLACK}Scenery Group Information",
                         content: [
                             label({ text: "{BLACK}Name:" }),
                             label({ text: compute(selectedGroup, group => group ? group.name : "None"), padding: { left: 16 } }),
@@ -390,10 +359,10 @@ function showWindow(): void {
                                     text: "/",
                                 }),
                                 label({
-                                    width: 25,
+                                    width: 30,
                                     text: compute(selectedGroup, toggle, group => {
-                                        if (!group) return padLeft("?", 23);
-                                        return padLeft(String(group.items.length), 23);
+                                        if (!group) return padLeft("?", 28);
+                                        return padLeft(String(group.items.length), 28);
                                     }),
                                 }),
                             ]),
@@ -404,11 +373,11 @@ function showWindow(): void {
                                         padding: { left: 16 },
                                     }),
                                     label({
-                                        width: 25,
+                                        width: 32,
                                         text: compute(selectedGroup, toggle, group => {
-                                            if (!group) return padLeft("?", 23);
+                                            if (!group) return padLeft("?", 30);
                                             const loaded = group.items.filter(id => objInfoCache.get(id) === type && isLoaded(id));
-                                            return padLeft(`${loaded.length}`, 23);
+                                            return padLeft(`${loaded.length}`, 30);
                                         }),
                                     }),
                                     label({
@@ -416,61 +385,57 @@ function showWindow(): void {
                                         text: "/",
                                     }),
                                     label({
-                                        width: 25,
+                                        width: 30,
                                         text: compute(selectedGroup, toggle, group => {
-                                            if (!group) return padLeft("?", 23);
+                                            if (!group) return padLeft("?", 28);
                                             const objects = group.items.filter(id => objInfoCache.get(id) === type);
-                                            return padLeft(String(objects.length), 23);
+                                            return padLeft(String(objects.length), 28);
                                         }),
                                     }),
                                 ]),
                             ),
+                        ],
+                    }),
+                    groupbox({
+                        text: "{BLACK}Loaded Objects Information",
+                        content: [
+                            ...(["small_scenery", "large_scenery", "wall", "footpath_addition", "banner", "peep_animations", "scenery_group"] satisfies ObjectType[]).map((type, idx) =>
+                                horizontal([
+                                    label({
+                                        text: `${toDisplayString(type)}:`,
+                                        padding: { left: 16 },
+                                    }),
+                                    label({
+                                        width: 32,
+                                        text: compute(toggle, () => padLeft(String(objectManager.getAllObjects(type).length), 30)),
+                                    }),
+                                    label({
+                                        width: 7,
+                                        text: "/",
+                                    }),
+                                    label({
+                                        width: 30,
+                                        text: padLeft(String(idx < 3 ? 2047 : 255), 28),
+                                    }),
+                                ]),
+                            ),
                             button({
-                                padding: { top: 16 },
-                                text: compute(selectedGroup, toggle, group => (group && isLoaded(group.identifier))
-                                    ? "Unload only group (but do not unload objects)"
-                                    : "Load only group (but do not load objects)"
-                                ),
-                                disabled: compute(selectedGroup, group => group === null),
+                                text: "Unload all unused",
+                                height: 14,
                                 onClick: () => {
-                                    const group = selectedGroup.get();
-                                    if (group) {
-                                        if (isLoaded(group.identifier))
-                                            unload(group.identifier);
-                                        else
-                                            load(group.identifier);
-                                        // force ui update
-                                        toggle.set(!toggle.get());
-                                    }
-                                },
-                            }),
-                            button({
-                                text: compute(selectedGroup, toggle, group => (group && isLoaded(group.identifier))
-                                    ? "Unload group and all objects (if unused)"
-                                    : "Load group and all objects"
-                                ),
-                                disabled: compute(selectedGroup, group => group === null),
-                                onClick: () => {
-                                    const group = selectedGroup.get();
-                                    if (group) {
-                                        if (isLoaded(group.identifier)) {
-                                            if (unloadUnused(group.items) === group.items.length)
-                                                unload(group.identifier);
-                                        } else {
-                                            load(group.identifier);
-                                            group.items.forEach(load);
-                                        }
-                                        // force ui update
-                                        toggle.set(!toggle.get());
-                                    }
+                                    unloadUnused(loaded.toArray().filter(obj => objInfoCache.get(obj) !== "scenery_group").filter(obj => objInfoCache.get(obj) !== "peep_animations"));
+                                    const time = Date.now();
+                                    installedGroups.filter(
+                                        group => isLoaded(group.identifier)
+                                    ).forEach(
+                                        group => group.items.some(isLoaded) || unload(group.identifier)
+                                    );
+                                    console.log(`[Scenery Group Loader] Unloaded unused groups in ${Date.now() - time}ms.`);
+                                    // force ui update
+                                    toggle.set(!toggle.get());
                                 },
                             }),
                         ],
-                    }),
-                    label({
-                        text: "Copyright (c) 2026 Sadret",
-                        disabled: true,
-                        alignment: "centred",
                     }),
                 ]),
             ]),
