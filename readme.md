@@ -2,6 +2,8 @@
 
 An OpenRCT2 plug-in to load and unload scenery groups and their objects.
 
+Coming out of an idea of [SixFrags](https://github.com/SixFrags), the main purpose of this plugin is to help you handle the object selection limit by allowing you to quickly unload all unused objects of a scenery group while keeping the scenery group active in the scenery build menu, which is not possible through the object selection window.
+
 ## Installation
 
 1. Make sure that your OpenRCT2 version is up-to-date. You need at least version `0.4.30` or a recent development version.
