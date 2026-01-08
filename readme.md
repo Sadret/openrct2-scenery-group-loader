@@ -10,7 +10,7 @@ Coming out of an idea of [SixFrags](https://github.com/SixFrags), the main purpo
 2. Go to the [releases](https://github.com/Sadret/openrct2-scenery-group-loader/releases) page and download the file [`openrct2-scenery-group-loader-1.0.0.js`](https://github.com/Sadret/openrct2-scenery-group-loader/releases/download/v1.0.0/openrct2-scenery-group-loader-1.0.0.js) from [release 1.0.0](https://github.com/Sadret/openrct2-scenery-group-loader/releases/tag/v1.0.0).
 3. Save it in the `plugin` subfolder of your OpenRCT2 user directory.\
 On Windows, this is usually at `C:Users\{User}\Documents\OpenRCT2\plugin`.\
-If you had a previous version of the Scenery Manager installed, make sure to delete its file from the `plugin` folder.
+If you had a previous version of the Scenery Group Loader installed, make sure to delete its file from the `plugin` folder.
 4. Start OpenRCT2 and open a scenario.
 
 ## Usage
