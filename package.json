@@ -1,6 +1,6 @@
 {
     "name": "openrct2-scenery-group-loader",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "OpenRCT2 Scenery Group Loader Plug-In",
     "author": "Sadret",
     "license": "GPL-3.0",
@@ -10,12 +10,13 @@
         "build-release": "rollup -c rollup.config.release.js"
     },
     "devDependencies": {
-        "@rollup/plugin-node-resolve": "^15.3.0",
-        "@rollup/plugin-terser": "^0.4.4",
-        "@rollup/plugin-typescript": "^12.1.1",
-        "rollup": "^4.27.3",
+        "@openrct2/types": "^0.5.5",
+        "@rollup/plugin-node-resolve": "^16.0.3",
+        "@rollup/plugin-terser": "^1.0.0",
+        "@rollup/plugin-typescript": "^12.3.0",
+        "rollup": "^4.64.0",
         "tslib": "^2.8.1",
-        "typescript": "^5.6.3"
+        "typescript": "^6.0.3"
     },
     "dependencies": {
         "openrct2-flexui": "^0.1.0-prerelease.20"

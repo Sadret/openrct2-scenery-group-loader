@@ -1,55 +1,11 @@
 /*****************************************************************************
- * Copyright (c) 2025 Sadret
+ * Copyright (c) 2025-2026 Sadret
  *
  * The OpenRCT2 plug-in "Scenery Group Loader" is licensed
  * under the GNU General Public License version 3.
  *****************************************************************************/
 
-/// <reference path="../../OpenRCT2/distribution/openrct2.d.ts" />
 import { button, compute, dropdown, groupbox, horizontal, label, listview, store, textbox, twoway, vertical, window } from 'openrct2-flexui';
-
-/*
- * CLASSES
- */
-
-class Set {
-    private readonly items: { [key: string]: undefined } = {};
-
-    constructor(initialItems?: string[]) {
-        if (initialItems)
-            initialItems.forEach(item => this.add(item));
-    }
-
-    add(item: string): void {
-        this.items[item] = undefined;
-    }
-    has(item: string): boolean {
-        return this.items.hasOwnProperty(item);
-    }
-    remove(item: string): void {
-        delete this.items[item];
-    }
-    toArray(): string[] {
-        return Object.keys(this.items);
-    }
-}
-
-class Map {
-    private readonly items: { [key: string]: string } = {};
-
-    set(item: string, value: string): void {
-        this.items[item] = value;
-    }
-    get(item: string): string | undefined {
-        return this.items[item];
-    }
-    has(item: string): boolean {
-        return this.items.hasOwnProperty(item);
-    }
-    remove(item: string): void {
-        delete this.items[item];
-    }
-}
 
 /*
  * TYPES
@@ -96,7 +52,7 @@ function getCount(type: ObjectType): number {
 
 registerPlugin({
     name: "scenery-group-loader",
-    version: "1.0.0",
+    version: "1.0.1",
     authors: ["Sadret"],
     type: "local",
     licence: "GPL-3.0",
@@ -128,7 +84,7 @@ const authorFilter = store<number>(0);
 function openWindow(): void {
     if (installedGroups.length === 0) {
         // cache installed objects info
-        const types = new Set(["scenery_group", "small_scenery", "large_scenery", "wall", "footpath_addition", "banner"] satisfies ObjectType[]);
+        const types = new Set<ObjectType>(["scenery_group", "small_scenery", "large_scenery", "wall", "footpath_addition", "banner"]);
         objectManager.installedObjects.forEach(obj => types.has(obj.type) && objInfoCache.set(obj.identifier, obj.type));
 
         // cache scenery groups and their items with checksummed identifiers
@@ -138,7 +94,7 @@ function openWindow(): void {
             if (match) idMapCache.set(match[1], obj.identifier);
         });
         const loadedGroups = new Set(objectManager.getAllObjects("scenery_group").map(group => group.identifier));
-        const authorCache = new Set();
+        const authorCache = new Set<string>();
         objectManager.installedObjects.filter(obj => obj.type === "scenery_group").forEach(installedGroup => {
             const authors = installedGroup.authors.join(", ") || "< Unknown >";
             authorCache.add(authors);
@@ -154,11 +110,11 @@ function openWindow(): void {
             if (!loadedGroups.has(installedGroup.identifier))
                 objectManager.unload(installedGroup.identifier);
         });
-        authors.push(...authorCache.toArray().sort());
+        authors.push(...authorCache.keys().toArray().sort());
     }
 
     // cache loaded objects
-    const loaded = new Set();
+    const loaded = new Set<string>();
     (["scenery_group", "small_scenery", "large_scenery", "wall", "footpath_addition", "banner"] satisfies ObjectType[]).forEach(
         type => objectManager.getAllObjects(type).forEach(obj => loaded.add(obj.identifier))
     );
@@ -183,7 +139,7 @@ function openWindow(): void {
     function unloadAll(ids: string[]): void {
         ids = ids.filter(isLoaded);
         objectManager.unload(ids);
-        ids.forEach(id => loaded.remove(id));
+        ids.forEach(id => loaded.delete(id));
     }
     function unloadUnused(objects: string[]): number {
         // find items that are unused and can be unloaded
@@ -194,13 +150,13 @@ function openWindow(): void {
                     switch (element.type) {
                         case "footpath":
                             if (element.addition)
-                                canUnload.remove(objectManager.getObject("footpath_addition", element.addition).identifier);
+                                canUnload.delete(objectManager.getObject("footpath_addition", element.addition).identifier);
                             break;
                         case "small_scenery":
                         case "wall":
                         case "large_scenery":
                         case "banner":
-                            canUnload.remove(objectManager.getObject(element.type, element.object).identifier);
+                            canUnload.delete(objectManager.getObject(element.type, element.object).identifier);
                             break;
                     }
 
@@ -214,10 +170,8 @@ function openWindow(): void {
         }
 
         // unload items
-        const canUnloadArr = canUnload.toArray();
-        unloadAll(canUnloadArr);
-
-        return canUnloadArr.length;
+        unloadAll(canUnload.keys().toArray());
+        return canUnload.size;
     }
 
     // ui toggle to force updates
@@ -266,7 +220,7 @@ function openWindow(): void {
             max: 2048,
         },
         position: "center",
-        title: "Scenery Group Loader (v.1.0.0)",
+        title: "Scenery Group Loader (v.1.0.1)",
         content: [
             horizontal([
                 vertical({
@@ -415,6 +369,12 @@ function openWindow(): void {
                                         }),
                                     ]),
                                 ),
+                                button({
+                                    text: "Place all objects of this group",
+                                    height: 24,
+                                    disabled: compute(selectedGroup, group => group === null),
+                                    onClick: () => activateTool(selectedGroup.get()!),
+                                }),
                             ],
                         }),
                         groupbox({
@@ -448,7 +408,7 @@ function openWindow(): void {
                                     text: "Unload ALL unused objects and groups",
                                     height: 24,
                                     onClick: () => {
-                                        unloadUnused(loaded.toArray().filter(obj => objInfoCache.get(obj) !== "scenery_group"));
+                                        unloadUnused(loaded.keys().filter(obj => objInfoCache.get(obj) !== "scenery_group").toArray());
                                         installedGroups.filter(
                                             group => isLoaded(group.identifier)
                                         ).forEach(
@@ -494,7 +454,7 @@ function openHelpWindow() {
             groupbox({
                 text: "{BLACK}Release Information:",
                 content: [
-                    "Scenery Group Loader v1.0.0",
+                    "Scenery Group Loader v1.0.1",
                     "Copyright (c) 2026 Sadret",
                     "The OpenRCT2 plugin \"Scenery Group Loader\" is licensed under the GNU General Public License version 3.",
                 ].map(text => label({ text })),
@@ -509,4 +469,247 @@ function openHelpWindow() {
             }),
         ],
     }).open();
+}
+
+/*
+ * scenery object placement tool
+ */
+function activateTool(group: GroupInfo) {
+    let objects = objectManager.load(group.items).filter(obj => obj !== null);
+    let last: null | CoordsXY = null;
+
+    const removeActions: { action: string, args: object }[] = [];
+    function removeGhosts() {
+        removeActions.forEach(({ action, args }) =>
+            context.queryAction(action, args, result => result.error || context.executeAction(action, args))
+        );
+        removeActions.length = 0;
+    }
+
+    function place(coords: CoordsXY, ghost: boolean) {
+        let length = Math.ceil(2 * Math.sqrt(objects.length));
+        let dx = 0;
+        let dy = 0;
+        let width = 1;
+        objects.forEach(object => {
+            if (dx > length) {
+                dx = 0;
+                dy += width + 1;
+                width = 1;
+            }
+            switch (object.type) {
+                case "small_scenery": {
+                    const args = {
+                        x: coords.x + 32 * dx,
+                        y: coords.y + 32 * dy,
+                        z: 0,
+                        direction: 0,
+                        object: object.index,
+                        primaryColour: 26,
+                        secondaryColour: 18,
+                        tertiaryColour: 24,
+                        quadrant: 0,
+                        flags: ghost ? 72 : 0,
+                    } satisfies SmallSceneryPlaceArgs & SmallSceneryRemoveArgs;
+                    context.queryAction("smallsceneryplace", args, result =>
+                        result.error || context.executeAction("smallsceneryplace", args, result =>
+                            result.error || ghost && removeActions.push({ action: "smallsceneryremove", args: { ...args, z: result.position?.z! } })
+                        )
+                    );
+                    break;
+                }
+                case "large_scenery": {
+                    const args = {
+                        x: coords.x + 32 * dx,
+                        y: coords.y + 32 * dy,
+                        z: 0,
+                        direction: 0,
+                        object: object.index,
+                        tileIndex: 0,
+                        primaryColour: 26,
+                        secondaryColour: 18,
+                        tertiaryColour: 24,
+                        flags: ghost ? 72 : 0,
+                    } satisfies LargeSceneryPlaceArgs & LargeSceneryRemoveArgs;
+                    context.queryAction("largesceneryplace", args, result =>
+                        result.error || context.executeAction("largesceneryplace", args, result =>
+                            result.error || ghost && removeActions.push({ action: "largesceneryremove", args: { ...args, z: result.position?.z! } })
+                        )
+                    );
+                    const { w, h } = (object as LargeSceneryObject).tiles.reduce((
+                        { w, h }, tile) => ({ w: Math.max(w, tile.offset.x / 32), h: Math.max(h, tile.offset.y / 32) }),
+                        { w: 0, h: 0 },
+                    );
+                    dx += w + 2;
+                    width = Math.max(width, h + 1);
+                    length = Math.max(length, dx - 2);
+                    return;
+                }
+                case "wall": {
+                    const args = {
+                        x: coords.x + 32 * dx,
+                        y: coords.y + 32 * dy,
+                        z: 0,
+                        edge: 0,
+                        direction: 0,
+                        object: object.index,
+                        primaryColour: 26,
+                        secondaryColour: 18,
+                        tertiaryColour: 24,
+                        flags: ghost ? 72 : 0,
+                    } satisfies WallPlaceArgs & WallRemoveArgs;
+                    context.queryAction("wallplace", args, result =>
+                        result.error || context.executeAction("wallplace", args, result =>
+                            result.error || ghost && removeActions.push({ action: "wallremove", args: { ...args, z: result.position?.z! } })
+                        )
+                    );
+                    break;
+                }
+                case "footpath_addition": {
+                    const ssArgs = {
+                        x: coords.x + 32 * dx,
+                        y: coords.y + 32 * dy,
+                        z: 0,
+                        direction: 0,
+                        object: objectManager.getAllObjects("small_scenery")[0]?.index,
+                        primaryColour: 26,
+                        secondaryColour: 18,
+                        tertiaryColour: 24,
+                        quadrant: 0,
+                        flags: ghost ? 72 : 0,
+                    } satisfies SmallSceneryPlaceArgs & SmallSceneryRemoveArgs;
+                    context.queryAction("smallsceneryplace", ssArgs, result => {
+                        if (result.error) return;
+                        const z = result.position?.z!;
+                        const footpathArgs = {
+                            x: coords.x + 32 * dx,
+                            y: coords.y + 32 * dy,
+                            z,
+                            direction: 0,
+                            object: 0,
+                            railingsObject: 0,
+                            slopeType: 0,
+                            slopeDirection: 0,
+                            constructFlags: 0,
+                            flags: ghost ? 72 : 0,
+                        } satisfies FootpathPlaceArgs & FootpathRemoveArgs;
+                        context.queryAction("footpathplace", footpathArgs, result =>
+                            result.error || context.executeAction("footpathplace", footpathArgs, result => {
+                                if (result.error) return;
+                                ghost && removeActions.push({ action: "footpathremove", args: footpathArgs });
+                                const additionArgs = { ...footpathArgs, object: object.index, } satisfies FootpathAdditionPlaceArgs & FootpathAdditionRemoveArgs;
+                                context.queryAction("footpathadditionplace", additionArgs, result => {
+                                    if (result.error) {
+                                        // try with queue instead
+                                        const queueArgs = { ...footpathArgs, constructFlags: 1 };
+                                        context.queryAction("footpathplace", queueArgs, result =>
+                                            result.error || context.executeAction("footpathplace", queueArgs, result =>
+                                                result.error || context.queryAction("footpathadditionplace", additionArgs, result =>
+                                                    result.error || context.executeAction("footpathadditionplace", additionArgs, result =>
+                                                        result.error || ghost && removeActions.push({ action: "footpathadditionremove", args: additionArgs })
+                                                    )
+                                                )
+                                            )
+                                        );
+                                    } else context.executeAction("footpathadditionplace", additionArgs, result =>
+                                        result.error || ghost && removeActions.push({ action: "footpathadditionremove", args: additionArgs })
+                                    );
+                                });
+                            })
+                        );
+                    });
+                    break;
+                }
+                case "banner": {
+                    const ssArgs = {
+                        x: coords.x + 32 * dx,
+                        y: coords.y + 32 * dy,
+                        z: 0,
+                        direction: 0,
+                        object: objectManager.getAllObjects("small_scenery")[0]?.index,
+                        primaryColour: 26,
+                        secondaryColour: 18,
+                        tertiaryColour: 24,
+                        quadrant: 0,
+                        flags: ghost ? 72 : 0,
+                    } satisfies SmallSceneryPlaceArgs & SmallSceneryRemoveArgs;
+                    context.queryAction("smallsceneryplace", ssArgs, result => {
+                        if (result.error) return;
+                        const z = result.position?.z!;
+                        const footpathArgs1 = {
+                            x: coords.x + 32 * dx + 32,
+                            y: coords.y + 32 * dy,
+                            z,
+                            direction: 0,
+                            object: 0,
+                            railingsObject: 0,
+                            slopeType: 0,
+                            slopeDirection: 0,
+                            constructFlags: 0,
+                            flags: ghost ? 72 : 0,
+                        } satisfies FootpathPlaceArgs & FootpathRemoveArgs;
+                        const footpathArgs2 = {
+                            ...footpathArgs1,
+                            x: footpathArgs1.x - 32,
+                        } satisfies FootpathPlaceArgs & FootpathRemoveArgs;
+                        context.queryAction("footpathplace", footpathArgs1, result =>
+                            result.error || context.executeAction("footpathplace", footpathArgs1, result => {
+                                if (result.error) return;
+                                ghost && removeActions.push({ action: "footpathremove", args: footpathArgs1 });
+                                result.error || context.queryAction("footpathplace", footpathArgs2, result =>
+                                    result.error || context.executeAction("footpathplace", footpathArgs2, result => {
+                                        if (result.error) return;
+                                        ghost && removeActions.push({ action: "footpathremove", args: footpathArgs2 });
+                                        const bannerArgs = {
+                                            ...footpathArgs1,
+                                            object: object.index,
+                                            primaryColour: 26,
+                                        } satisfies BannerPlaceArgs & BannerRemoveArgs;
+                                        context.queryAction("bannerplace", bannerArgs, result =>
+                                            result.error || context.executeAction("bannerplace", bannerArgs, result =>
+                                                result.error || ghost && removeActions.push({ action: "bannerremove", args: bannerArgs })
+                                            )
+                                        );
+                                    })
+                                );
+                            })
+                        );
+                    });
+                    dx += 3;
+                    return;
+                }
+            }
+            dx += 2;
+        });
+    }
+
+    ui.activateTool({
+        id: "sgl-placement",
+        cursor: "tree_down",
+        filter: ["terrain"],
+        onStart: () => ui.mainViewport.visibilityFlags |= 1 << 7,
+        onFinish() {
+            ui.mainViewport.visibilityFlags &= ~(1 << 7);
+            removeGhosts();
+        },
+        onMove(e) {
+            const coords = e.mapCoords;
+            if (coords === undefined || coords.x * coords.y === 0)
+                return;
+            if (last !== null && coords.x === last.x && coords.y === last.y)
+                return;
+
+            removeGhosts();
+            last = coords;
+            ui.tileSelection.tiles = [coords];
+            place(coords, true);
+        },
+        onDown(e) {
+            const coords = e.mapCoords;
+            if (coords === undefined || coords.x * coords.y === 0)
+                return;
+            removeGhosts();
+            place(coords, false);
+        },
+    });
 }

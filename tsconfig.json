@@ -1,16 +1,23 @@
 {
     "compilerOptions": {
-        "target": "ES5",
+        "target": "ES2023",
         "module": "ESNext",
-        "lib": ["ESNext"],
+        "lib": [
+            "ESNext"
+        ],
         "strict": true,
-        "moduleResolution": "node",
+        "moduleResolution": "bundler",
         "esModuleInterop": true,
         "skipLibCheck": true,
         "forceConsistentCasingInFileNames": true,
         "paths": {
-            "@src/*": ["./src/*"]
+            "@src/*": [
+                "./src/*"
+            ]
         },
+        "types": [
+            "@openrct2/types"
+        ],
     },
     "include": [
         "./src/**/*.ts",
